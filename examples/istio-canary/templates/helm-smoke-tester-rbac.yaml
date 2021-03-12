@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: helm-smoke-tester
+  labels:
+    {{- include "istio-canary.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list", "update"]
+  # choose the permission based on helm test type (Pod or Job) 
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["create", "list", "delete", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "jobs/log"]
+    verbs: ["create", "list", "delete", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: helm-smoke-tester
+  labels:
+    {{- include "istio-canary.labels" . | nindent 4 }}
+subjects:
+  - kind: User
+    name: system:serviceaccount:kube-system:{{ .Release.Namespace }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: helm-smoke-tester
+  apiGroup: rbac.authorization.k8s.io

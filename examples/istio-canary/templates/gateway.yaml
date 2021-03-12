@@ -1,0 +1,38 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ include "istio-canary.fullname" . }}
+  labels:
+    {{- include "istio-canary.labels" . | nindent 4 }}
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      {{- if .Values.gateway.tls.enable }}
+      tls:
+        httpsRedirect: true
+      {{- end }}
+      hosts:
+      {{- range .Values.gateway.hosts }}
+        - {{ . }}
+      {{- end }}
+      {{- range .Values.gateway.canary }}
+        - {{ . }}
+      {{- end }}
+  {{- if .Values.gateway.tls.enable }}
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: {{ .Values.gateway.tls.secretName }}
+    hosts:
+    {{- range .Values.gateway.hosts }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}

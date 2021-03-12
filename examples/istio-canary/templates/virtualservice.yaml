@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "istio-canary.fullname" . }}-canary
+  labels:
+    {{- include "istio-canary.labels" . | nindent 4 }}
+spec:
+  gateways:
+  - {{ include "istio-canary.fullname" . }}
+  hosts:
+  {{- range .Values.gateway.canary }}
+    - {{ . }}
+  {{- end }}
+  http:
+  - route:
+    - destination:
+        host: {{ include "istio-canary.fullname" . }}-canary

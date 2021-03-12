@@ -1,0 +1,110 @@
+{{- if .Values.canary.enabled }}
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: {{ template "istio-canary.fullname" . }}
+  labels:
+    {{- include "istio-canary.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name:  {{ template "istio-canary.fullname" . }}
+  progressDeadlineSeconds: {{ .Values.canary.progressDeadlineSeconds }}
+  {{- if .Values.autoscaling.enabled }}
+  autoscalerRef:
+    apiVersion: autoscaling/v2beta1
+    kind: HorizontalPodAutoscaler
+    name:  {{ template "istio-canary.fullname" . }}
+  {{- end }}
+  service:
+    port: {{ .Values.service.port }}
+    targetPort: {{ .Values.service.targetPort }}
+    gateways:
+    -  {{ include "istio-canary.fullname" . }}
+    hosts:
+    {{- range .Values.gateway.hosts }}
+      - {{ . }}
+    {{- end }}
+    trafficPolicy:
+      tls:
+        mode: {{ .Values.canary.istioTLS }}
+    retries:
+      attempts: 3
+      perTryTimeout: 1s
+      retryOn: "gateway-error,connect-failure,refused-stream"
+  analysis:
+    interval: {{ .Values.canary.analysis.interval }}
+    threshold: {{ .Values.canary.analysis.threshold }}
+    {{- if .Values.canary.analysis.mirror }}
+    mirror: {{ .Values.canary.analysis.mirror }}
+    iterations: {{ .Values.canary.analysis.iterations }}
+    mirrorWeight: {{ .Values.canary.analysis.mirrorWeight }}
+    {{- else }}
+    maxWeight: {{ .Values.canary.analysis.maxWeight }}
+    stepWeight: {{ .Values.canary.analysis.stepWeight }}
+    {{- end }}
+    metrics:
+    - name: request-success-rate
+      thresholdRange: 
+        min: {{ .Values.canary.thresholds.successRate }}
+      interval: 1m
+    - name: request-duration
+      thresholdRange: 
+        max: {{ .Values.canary.thresholds.latency }}
+      interval: 1m
+    {{- if or (eq .Values.canary.helmtest.enabled true) (eq .Values.canary.loadtest.enabled true) }}
+    webhooks:
+      {{- if .Values.canary.helmtest.enabled }}
+      - name: "helm test"
+        type: pre-rollout
+        url: {{ .Values.canary.helmtest.url }}
+        timeout: 3m
+        metadata:
+          type: "helmv3"
+          cmd: "test {{ .Release.Name }} -n {{ .Release.Namespace }}"
+      {{- end }}
+      {{- if .Values.canary.loadtest.enabled }}
+      - name: load-test-get
+        type: rollout
+        url: {{ .Values.canary.loadtest.url }}
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 5 -c 2 http://{{ template "istio-canary.fullname" . }}-canary.{{ .Release.Namespace }}:{{ .Values.service.port }}"
+      {{- end }}
+      {{- if .Values.canary.confirm.promotion.enabled }}
+      - name: "close gate"
+        type: pre-rollout
+        url: {{ .Values.canary.loadtest.url }}
+        timeout: 5s
+        metadata:
+          cmd: "curl -d '{\"name\":\"{{ template "istio-canary.fullname" . }}\",\"namespace\":\"{{ .Release.Namespace }}\"}' http://localhost:8080/gate/close"
+      - name: "confirm-promotion"
+        type: confirm-promotion
+        url: {{ .Values.canary.loadtest.url }}gate/check
+      - name: "close gate"
+        type: post-rollout
+        url: {{ .Values.canary.loadtest.url }}
+        timeout: 5s
+        metadata:
+          cmd: "curl -d '{\"name\":\"{{ template "istio-canary.fullname" . }}\",\"namespace\":\"{{ .Release.Namespace }}\"}' http://localhost:8080/gate/close"
+      {{- end }}
+      {{- if .Values.canary.confirm.rollout.enabled }}
+      - name: "close rollback"
+        type: pre-rollout
+        url: {{ .Values.canary.loadtest.url }}
+        timeout: 5s
+        metadata:
+          cmd: "curl -d '{\"name\":\"{{ template "istio-canary.fullname" . }}\",\"namespace\":\"{{ .Release.Namespace }}\"}' http://localhost:8080/rollback/close"
+      - name: "rollback"
+        type: rollback
+        url: {{ .Values.canary.loadtest.url }}rollback/check
+      - name: "close rollback"
+        type: post-rollout
+        url: {{ .Values.canary.loadtest.url }}
+        timeout: 5s
+        metadata:
+          cmd: "curl -d '{\"name\":\"{{ template "istio-canary.fullname" . }}\",\"namespace\":\"{{ .Release.Namespace }}\"}' http://localhost:8080/rollback/close"
+      {{- end }}
+    {{- end }}
+{{- end }}
