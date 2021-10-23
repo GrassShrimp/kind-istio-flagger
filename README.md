@@ -9,7 +9,6 @@ This is a demo for demonstrate canary deployment via istio with flagger
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 - [helm](https://helm.sh/docs/intro/install/)
-- [istioctl](https://istio.io/latest/docs/setup/getting-started/#download) or [brew install istioctl](https://formulae.brew.sh/formula/istioctl)
 
 ## Usage
 

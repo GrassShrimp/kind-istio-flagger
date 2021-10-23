@@ -2,8 +2,7 @@ resource "helm_release" "helmtester" {
   name       = "helmtester"
   repository = "https://flagger.app"
   chart      = "loadtester"
-  version    = "0.18.0"
+  version    = var.LOADTESTER_VERSION
   namespace  = "kube-system"
-
-  depends_on = [ null_resource.installing-istio, helm_release.flagger ]
+  depends_on = [ time_sleep.wait_istio_ready, helm_release.flagger ]
 }

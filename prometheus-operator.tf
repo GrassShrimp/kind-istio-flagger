@@ -2,9 +2,8 @@ resource "helm_release" "prometheus-operator" {
   name              = "prometheus-operator"
   repository        = "https://prometheus-community.github.io/helm-charts" 
   chart             = "kube-prometheus-stack"
-  version           = "13.13.1"
+  version           = var.PROMETHEUS_VERSION
   namespace         = "kube-mon"
-
   values = [
   <<EOF
   prometheus:
@@ -41,21 +40,49 @@ resource "helm_release" "prometheus-operator" {
     adminPassword: admin
   EOF
   ]
-
   create_namespace  = true
-
-  depends_on = [ null_resource.installing-istio ]
+  depends_on = [
+    time_sleep.wait_istio_ready
+  ]
 }
-
-resource "null_resource" "grafana-route" {
+resource "local_file" "grafana-route" {
+  content  = <<-EOF
+  apiVersion: networking.istio.io/v1alpha3
+  kind: Gateway
+  metadata:
+    name: grafana
+  spec:
+    selector:
+      istio: ingressgateway
+    servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+      - "grafana.pinjyun.local"
+  ---
+  apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: grafana
+  spec:
+    hosts:
+    - "grafana.pinjyun.local"
+    gateways:
+    - grafana
+    http:
+    - route:
+      - destination:
+          host: prometheus-operator-grafana.kube-mon.svc.cluster.local
+          port:
+            number: 80
+  EOF
+  filename = "${path.root}/configs/grafana-route.yaml"
   provisioner "local-exec" {
-    command = "kubectl apply -f ./grafana-route.yaml -n ${helm_release.prometheus-operator.namespace}"
+    command = "kubectl apply -f ${self.filename} -n ${helm_release.prometheus-operator.namespace}"
   }
-
-  provisioner "local-exec" {
-    when = destroy
-    command = "kubectl delete -f ./grafana-route.yaml -n kube-mon"
-  }
-
-  depends_on = [ helm_release.prometheus-operator ]
+  depends_on = [
+    helm_release.prometheus-operator
+  ]
 }
