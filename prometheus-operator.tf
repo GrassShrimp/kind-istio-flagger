@@ -60,7 +60,7 @@ resource "local_file" "grafana-route" {
         name: http
         protocol: HTTP
       hosts:
-      - "grafana.pinjyun.local"
+      - "grafana.${data.kubernetes_service.istio-ingressgateway.status.0.load_balancer.0.ingress.0.ip}.nip.io"
   ---
   apiVersion: networking.istio.io/v1alpha3
   kind: VirtualService
@@ -68,7 +68,7 @@ resource "local_file" "grafana-route" {
     name: grafana
   spec:
     hosts:
-    - "grafana.pinjyun.local"
+    - "grafana.${data.kubernetes_service.istio-ingressgateway.status.0.load_balancer.0.ingress.0.ip}.nip.io"
     gateways:
     - grafana
     http:
