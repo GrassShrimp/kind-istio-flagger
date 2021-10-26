@@ -42,7 +42,7 @@ resource "helm_release" "prometheus-operator" {
   ]
   create_namespace  = true
   depends_on = [
-    time_sleep.wait_istio_ready
+    module.kind-istio-metallb
   ]
 }
 resource "local_file" "grafana-route" {
@@ -60,7 +60,7 @@ resource "local_file" "grafana-route" {
         name: http
         protocol: HTTP
       hosts:
-      - "grafana.${data.kubernetes_service.istio-ingressgateway.status.0.load_balancer.0.ingress.0.ip}.nip.io"
+      - "grafana.${module.kind-istio-metallb.ingress_ip_address}.nip.io"
   ---
   apiVersion: networking.istio.io/v1alpha3
   kind: VirtualService
@@ -68,7 +68,7 @@ resource "local_file" "grafana-route" {
     name: grafana
   spec:
     hosts:
-    - "grafana.${data.kubernetes_service.istio-ingressgateway.status.0.load_balancer.0.ingress.0.ip}.nip.io"
+    - "grafana.${module.kind-istio-metallb.ingress_ip_address}.nip.io"
     gateways:
     - grafana
     http:

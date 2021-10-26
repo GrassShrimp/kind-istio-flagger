@@ -4,5 +4,5 @@ resource "helm_release" "helmtester" {
   chart      = "loadtester"
   version    = var.LOADTESTER_VERSION
   namespace  = "kube-system"
-  depends_on = [ time_sleep.wait_istio_ready, helm_release.flagger ]
+  depends_on = [ module.kind-istio-metallb, helm_release.flagger ]
 }

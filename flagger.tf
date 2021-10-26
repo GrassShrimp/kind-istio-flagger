@@ -11,5 +11,5 @@ resource "helm_release" "flagger" {
   EOF
   ]
   create_namespace = true
-  depends_on = [ time_sleep.wait_istio_ready, helm_release.prometheus-operator ]
+  depends_on = [ module.kind-istio-metallb, helm_release.prometheus-operator ]
 }
